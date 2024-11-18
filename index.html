@@ -31,11 +31,12 @@
       border-radius: 10px;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       margin: 20px;
+      width: 300px;
     }
 
     input {
       padding: 10px;
-      width: 250px;
+      width: 100%;
       margin: 10px 0;
       border-radius: 5px;
       border: 1px solid #ccc;
@@ -73,21 +74,6 @@
       border-radius: 5px;
     }
 
-    .auth-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .auth-button {
-      background-color: #3b82f6;
-      color: white;
-    }
-
-    .auth-button:hover {
-      background-color: #2563eb;
-    }
-
     #palette {
       margin-top: 20px;
     }
@@ -104,7 +90,6 @@
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-    import { getDatabase, ref, set, get, child, onValue, update } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 
     // Firebase config
@@ -121,7 +106,6 @@
 
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
     const auth = getAuth();
 
     // DOM Elements
@@ -133,7 +117,6 @@
     const palette = document.getElementById("palette");
     const loginButton = document.getElementById("login-button");
     const signupButton = document.getElementById("signup-button");
-    const guestButton = document.getElementById("guest-button");
     const signOutButton = document.getElementById("signout-button");
 
     let currentColor = "black";
@@ -224,11 +207,6 @@
         });
     });
 
-    // Guest Mode
-    guestButton.addEventListener("click", () => {
-      alert("You're using Guest Mode!");
-    });
-
     // Monitor auth state changes (for signed-in user)
     onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -238,11 +216,11 @@
         signOutButton.style.display = "block";
         canvasContainer.style.display = "block";
       } else {
-        // User is signed out
-        loginForm.style.display = "block";
-        signupForm.style.display = "block";
+        // User is signed out (guest mode)
+        loginForm.style.display = "none";
+        signupForm.style.display = "none";
         signOutButton.style.display = "none";
-        canvasContainer.style.display = "none";
+        canvasContainer.style.display = "block";  // Canvas accessible in guest mode
       }
     });
 
@@ -252,31 +230,28 @@
 
   <h1>ArtForge - Collaborative Pixel Art Creator</h1>
 
-  <!-- Sign Up Form -->
-  <div id="signup-form" class="form-container">
+  <!-- Sign Up Form (Initially Hidden) -->
+  <div id="signup-form" class="form-container" style="display:none;">
     <h2>Sign Up</h2>
     <input id="signup-email" type="email" placeholder="Email" />
     <input id="signup-password" type="password" placeholder="Password" />
     <button id="signup-button">Sign Up</button>
   </div>
 
-  <!-- Login Form -->
-  <div id="login-form" class="form-container">
+  <!-- Login Form (Initially Hidden) -->
+  <div id="login-form" class="form-container" style="display:none;">
     <h2>Login</h2>
     <input id="login-email" type="email" placeholder="Email" />
     <input id="login-password" type="password" placeholder="Password" />
     <button id="login-button">Login</button>
   </div>
 
-  <!-- Guest Mode -->
-  <button id="guest-button" class="auth-button">Continue as Guest</button>
-
-  <!-- Canvas -->
-  <div id="canvas-container" style="display:none;">
+  <!-- Canvas (Visible to All Users) -->
+  <div id="canvas-container">
     <canvas id="paint-canvas"></canvas>
   </div>
 
-  <!-- Sign out Button -->
+  <!-- Sign out Button (Only visible if logged in) -->
   <button id="signout-button" style="display:none;">Sign Out</button>
 
   <!-- Palette -->
