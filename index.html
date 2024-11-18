@@ -185,12 +185,16 @@
     const deleteRoomButton = document.getElementById("delete-room");
     const brushSizeSlider = document.getElementById("brush-size");
     const brushSizeDisplay = document.getElementById("brush-size-display");
+    const publicBoardCanvas = document.getElementById("public-board-canvas");
     const roomStatus = document.getElementById("room-status");
+    const resetCanvasButton = document.getElementById("reset-canvas");
+    const undoButton = document.getElementById("undo");
 
     let currentColor = "black";
     let brushSize = 5;
     let currentRoom = null;
     let isHost = false;
+    let history = [];  // To store canvas states for undo functionality
 
     // Set up color palette
     const colors = ["red", "green", "blue", "yellow", "black", "white"];
@@ -261,23 +265,27 @@
         get(roomRef).then((snapshot) => {
           if (!snapshot.exists()) {
             set(roomRef, {
-              createdBy: user,
               password: roomPassword,
-              members: [user]
+              users: [user],
+              boardState: null,
             }).then(() => {
+              roomStatus.textContent = `Room '${roomName}' created successfully!`;
               currentRoom = roomName;
-              roomStatus.textContent = `Created Room: ${roomName} (You are the Host)`;
+              isHost = true;
+            }).catch((error) => {
+              roomStatus.textContent = `Error creating room: ${error.message}`;
             });
           } else {
-            alert("Room already exists!");
+            roomStatus.textContent = "Room already exists!";
           }
         });
       }
     });
 
-    joinRoomButton.addEventListener("click", (e) => {
+    joinRoomButton.addEventListener("click", () => {
       const roomName = roomNameInput.value;
       const roomPassword = roomPasswordInput.value;
+      const user = auth.currentUser ? auth.currentUser.email : "Guest";
 
       if (roomName && roomPassword) {
         const roomRef = ref(db, "rooms/" + roomName);
@@ -285,118 +293,117 @@
           if (snapshot.exists()) {
             const roomData = snapshot.val();
             if (roomData.password === roomPassword) {
-              currentRoom = roomName;
-              roomStatus.textContent = `Joined Room: ${roomName}`;
+              // Join room
+              update(roomRef, {
+                users: [...roomData.users, user],
+              }).then(() => {
+                roomStatus.textContent = `Joined room '${roomName}'!`;
+                currentRoom = roomName;
+                isHost = false;
+              }).catch((error) => {
+                roomStatus.textContent = `Error joining room: ${error.message}`;
+              });
             } else {
-              alert("Incorrect password.");
+              roomStatus.textContent = "Incorrect room password!";
             }
           } else {
-            alert("Room not found.");
+            roomStatus.textContent = "Room not found!";
           }
         });
       }
     });
 
-    deleteRoomButton.addEventListener("click", (e) => {
-      if (isHost && currentRoom) {
+    // Handle Room Deletion (host only)
+    deleteRoomButton.addEventListener("click", () => {
+      if (isHost) {
         const roomRef = ref(db, "rooms/" + currentRoom);
         remove(roomRef).then(() => {
-          roomStatus.textContent = "Room deleted.";
+          roomStatus.textContent = `Room '${currentRoom}' deleted!`;
           currentRoom = null;
           isHost = false;
+        }).catch((error) => {
+          roomStatus.textContent = `Error deleting room: ${error.message}`;
         });
+      } else {
+        roomStatus.textContent = "Only the host can delete the room!";
       }
     });
 
-    // Firebase Authentication
-    loginButton.addEventListener("click", () => {
-      const email = document.getElementById("login-email").value;
-      const password = document.getElementById("login-password").value;
-
-      signInWithEmailAndPassword(auth, email, password)
-        .then(() => {
-          alert("Logged in successfully!");
-        })
-        .catch((error) => {
-          alert(error.message);
-        });
+    // Handle Reset Canvas
+    resetCanvasButton.addEventListener("click", () => {
+      ctx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
+      history = []; // Clear history on reset
     });
 
-    signupButton.addEventListener("click", () => {
-      const email = document.getElementById("signup-email").value;
-      const password = document.getElementById("signup-password").value;
-
-      createUserWithEmailAndPassword(auth, email, password)
-        .then(() => {
-          alert("Account created successfully!");
-        })
-        .catch((error) => {
-          alert(error.message);
-        });
+    // Handle Undo
+    undoButton.addEventListener("click", () => {
+      if (history.length > 0) {
+        const previousState = history.pop();
+        ctx.putImageData(previousState, 0, 0);
+      }
     });
 
-    signOutButton.addEventListener("click", () => {
-      signOut(auth)
-        .then(() => {
-          alert("Logged out successfully!");
-        })
-        .catch((error) => {
-          alert(error.message);
-        });
-    });
+    // Function to save the canvas state to history
+    function saveCanvasState() {
+      history.push(ctx.getImageData(0, 0, paintCanvas.width, paintCanvas.height));
+    }
 
+    // Save the initial state when starting
+    saveCanvasState();
+
+    // Listen for changes in user authentication state
     onAuthStateChanged(auth, (user) => {
       if (user) {
-        document.getElementById("auth-section").style.display = "none";
-        document.getElementById("room-container").style.display = "block";
-        signOutButton.style.display = "inline";
+        signOutButton.style.display = "inline-block";
+        loginButton.style.display = "none";
+        signupButton.style.display = "none";
       } else {
-        document.getElementById("auth-section").style.display = "block";
-        document.getElementById("room-container").style.display = "none";
+        signOutButton.style.display = "none";
+        loginButton.style.display = "inline-block";
+        signupButton.style.display = "inline-block";
       }
     });
-
   </script>
 </head>
 <body>
   <h1>ArtForge - Collaborative Pixel Art Creator</h1>
 
-  <div id="auth-section">
-    <div class="form-container active">
-      <input type="email" id="login-email" placeholder="Email" />
-      <input type="password" id="login-password" placeholder="Password" />
-      <button id="login-button">Login</button>
-    </div>
-    <div class="form-container">
-      <input type="email" id="signup-email" placeholder="Email" />
-      <input type="password" id="signup-password" placeholder="Password" />
-      <button id="signup-button">Sign Up</button>
-    </div>
+  <!-- Authentication -->
+  <div class="auth-button">
+    <button id="login-button">Login</button>
+    <button id="signup-button">Signup</button>
+    <button id="signout-button">Sign Out</button>
   </div>
 
+  <!-- Room Management -->
   <div id="room-container">
     <input type="text" id="room-name" placeholder="Room Name" />
     <input type="password" id="room-password" placeholder="Room Password" />
     <button id="create-room">Create Room</button>
     <button id="join-room">Join Room</button>
     <button id="delete-room">Delete Room</button>
-
     <div id="room-status"></div>
   </div>
 
+  <!-- Canvas Section -->
   <div id="canvas-container">
     <canvas id="paint-canvas"></canvas>
   </div>
 
+  <!-- Brush Size and Palette -->
   <div id="brush-size-container">
-    <input type="range" id="brush-size" min="1" max="50" value="5" />
-    <p id="brush-size-display">Brush Size: 5px</p>
+    <label for="brush-size">Brush Size: </label>
+    <input type="range" id="brush-size" min="1" max="10" value="5" />
+    <span id="brush-size-display">Brush Size: 5px</span>
   </div>
 
+  <!-- Color Palette -->
   <div id="palette"></div>
 
-  <div class="auth-button">
-    <button id="signout-button">Sign Out</button>
+  <!-- Undo and Reset buttons -->
+  <div>
+    <button id="undo">Undo</button>
+    <button id="reset-canvas">Reset Canvas</button>
   </div>
 </body>
 </html>
