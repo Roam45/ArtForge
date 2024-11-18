@@ -5,51 +5,56 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ArtForge - Collaborative Pixel Art Creator</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
+    * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
-      background-color: #f0f0f0;
-      text-align: center;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
+      background: linear-gradient(135deg, #6e7dff, #44a0ff); /* Linear gradient background */
+      min-height: 100vh;
+      padding: 20px;
+      color: white;
     }
-
     h1 {
-      font-size: 2rem;
-      margin-top: 10px;
-      color: #333;
+      color: #ffffff;
+      margin-bottom: 20px;
     }
 
-    .form-container {
-      background-color: #fff;
-      padding: 30px;
+    #room-container {
+      margin-top: 20px;
+      background-color: white;
+      padding: 20px;
       border-radius: 10px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      margin: 20px;
-      width: 300px;
+      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+      width: 350px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      text-align: center;
     }
 
-    input {
+    input, button {
       padding: 10px;
-      width: 100%;
       margin: 10px 0;
       border-radius: 5px;
-      border: 1px solid #ccc;
+      border: 1px solid #ddd;
+      font-size: 1rem;
+    }
+
+    input[type="text"], input[type="password"], input[type="email"] {
+      width: 100%;
+      background-color: #f9f9f9;
     }
 
     button {
-      padding: 10px 20px;
-      width: 100%;
-      margin: 10px 0;
-      border-radius: 5px;
-      border: none;
       background-color: #4CAF50;
       color: white;
-      font-size: 1rem;
       cursor: pointer;
     }
 
@@ -58,18 +63,19 @@
     }
 
     #canvas-container {
+      margin-top: 30px;
+      background-color: #ffffff;
       width: 80%;
       height: 400px;
-      background-color: white;
       border: 1px solid #ddd;
-      margin-top: 20px;
-      border-radius: 10px;
       display: flex;
       justify-content: center;
       align-items: center;
+      border-radius: 10px;
     }
 
-    #paint-canvas {
+    canvas {
+      background-color: #ffffff;
       border-radius: 5px;
     }
 
@@ -79,31 +85,51 @@
 
     .color {
       display: inline-block;
-      width: 30px;
-      height: 30px;
-      margin: 0 5px;
-      border: 1px solid black;
+      width: 40px;
+      height: 40px;
+      margin: 5px;
+      border: 1px solid #ddd;
       cursor: pointer;
-    }
-
-    .auth-button {
-      margin-top: 10px;
-    }
-
-    #room-container {
-      margin: 20px;
+      border-radius: 5px;
     }
 
     #brush-size-container {
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    #brush-size {
+      width: 100%;
+    }
+
+    .auth-button {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .form-container {
+      display: none;
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+      width: 350px;
       margin-top: 20px;
     }
 
-    #public-board {
-      margin-top: 20px;
+    .form-container.active {
+      display: block;
     }
 
-    .brush-size {
-      margin: 5px;
+    .form-container input {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    #signout-button {
+      display: none;
     }
 
   </style>
@@ -112,7 +138,7 @@
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
     import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
 
-    // Firebase config
+    // Firebase configuration
     const firebaseConfig = {
       apiKey: "AIzaSyC-wJdotEQqjlpCMrmBXaa7VCxTnG_0ksw",
       authDomain: "eeeeeeee-5fcd8.firebaseapp.com",
@@ -130,8 +156,6 @@
     const db = getDatabase();
 
     // DOM Elements
-    const loginForm = document.getElementById("login-form");
-    const signupForm = document.getElementById("signup-form");
     const canvasContainer = document.getElementById("canvas-container");
     const paintCanvas = document.getElementById("paint-canvas");
     const ctx = paintCanvas.getContext("2d");
@@ -226,34 +250,6 @@
       });
     });
 
-    // Create Public Board for Everyone to Draw
-    const publicBoardCtx = publicBoardCanvas.getContext("2d");
-    publicBoardCanvas.width = 500;
-    publicBoardCanvas.height = 400;
-
-    publicBoardCanvas.addEventListener("mousedown", (e) => {
-      painting = true;
-      drawPublicBoard(e);
-    });
-
-    publicBoardCanvas.addEventListener("mousemove", (e) => {
-      if (painting) {
-        drawPublicBoard(e);
-      }
-    });
-
-    publicBoardCanvas.addEventListener("mouseup", () => {
-      painting = false;
-    });
-
-    function drawPublicBoard(e) {
-      const rect = publicBoardCanvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      publicBoardCtx.fillStyle = currentColor;
-      publicBoardCtx.fillRect(x, y, brushSize, brushSize);
-    }
-
     // Firebase Auth: Sign Up
     signupButton.addEventListener("click", (e) => {
       e.preventDefault();
@@ -282,7 +278,7 @@
         });
     });
 
-    // Sign Out
+    // Firebase Auth: Sign Out
     signOutButton.addEventListener("click", () => {
       signOut(auth).then(() => {
         alert("Signed Out Successfully!");
@@ -296,6 +292,7 @@
       if (user) {
         document.getElementById("canvas-container").style.display = "block";
         signOutButton.style.display = "block";
+        document.querySelectorAll('.form-container').forEach(f => f.classList.remove('active'));
       } else {
         document.getElementById("canvas-container").style.display = "none";
         signOutButton.style.display = "none";
@@ -308,11 +305,23 @@
         alert("You are using Guest Mode");
       }
     });
+
+    // Handle Form Toggles for Login/Signup
+    document.getElementById("login-button").addEventListener("click", () => {
+      document.getElementById("signup-form").classList.remove("active");
+      document.getElementById("login-form").classList.add("active");
+    });
+
+    document.getElementById("signup-button").addEventListener("click", () => {
+      document.getElementById("login-form").classList.remove("active");
+      document.getElementById("signup-form").classList.add("active");
+    });
   </script>
 </head>
 <body>
   <h1>Welcome to ArtForge</h1>
 
+  <!-- Room Section -->
   <div id="room-container">
     <h2>Create/Join Room</h2>
     <input type="text" id="room-name" placeholder="Room Name" />
@@ -323,11 +332,12 @@
 
   <!-- Brush Size Selection -->
   <div id="brush-size-container">
-    <label>Brush Size: </label>
+    <label>Brush Size:</label>
     <input id="brush-size" type="range" min="1" max="64" value="5" />
     <span id="brush-size-display">Brush Size: 5px</span>
   </div>
 
+  <!-- Canvas Section -->
   <div id="canvas-container" style="display:none;">
     <canvas id="paint-canvas"></canvas>
   </div>
@@ -338,12 +348,13 @@
 
   <div id="palette"></div>
 
+  <!-- Auth Section -->
   <div class="auth-button">
     <button id="signup-button">Sign Up</button>
     <button id="login-button">Log In</button>
   </div>
 
-  <!-- Forms -->
+  <!-- Login Form -->
   <div class="form-container" id="login-form">
     <h2>Login</h2>
     <input type="email" id="login-email" placeholder="Email" />
@@ -351,6 +362,7 @@
     <button id="login-button">Log In</button>
   </div>
 
+  <!-- Signup Form -->
   <div class="form-container" id="signup-form">
     <h2>Sign Up</h2>
     <input type="email" id="signup-email" placeholder="Email" />
