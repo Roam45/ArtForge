@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArtForge - Collaborative Pixel Art Creator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+    #room-ui, #painting-ui {
+      margin-top: 20px;
+    }
+    #grid {
+      display: grid;
+      justify-content: center;
+      margin-top: 10px;
+      border: 1px solid #ddd;
+    }
+    .cell {
+      border: 1px solid #eee;
+      cursor: pointer;
+    }
+    #palette {
+      margin-top: 20px;
+    }
+    .color {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      margin: 0 5px;
+      border: 1px solid black;
+      cursor: pointer;
+    }
+    #animation-controls {
+      margin-top: 20px;
+    }
+    #grid-size-slider {
+      margin-top: 20px;
+    }
+    #x-slider, #y-slider {
+      margin-top: 20px;
+    }
+  </style>
+  <script type="module">
+    // Import the functions you need from the Firebase SDK
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
+    import { getDatabase, ref, set, get, child, onValue, update } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyC-wJdotEQqjlpCMrmBXaa7VCxTnG_0ksw",
+      authDomain: "eeeeeeee-5fcd8.firebaseapp.com",
+      databaseURL: "https://eeeeeeee-5fcd8-default-rtdb.firebaseio.com",
+      projectId: "eeeeeeee-5fcd8",
+      storageBucket: "eeeeeeee-5fcd8.firebasestorage.app",
+      messagingSenderId: "120108097948",
+      appId: "1:120108097948:web:ff67fe909b919397a3a859",
+      measurementId: "G-3K7B56SWMH"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Variables
+    let currentColor = "black";
+    let currentRoom = null;
+    let frames = [[]];
+    let currentFrame = 0;
+    let gridSizeX = 16;
+    let gridSizeY = 16;
+
+    // DOM Elements
+    const roomUI = document.getElementById("room-ui");
+    const paintingUI = document.getElementById("painting-ui");
+    const roomTitle = document.getElementById("room-title");
+    const grid = document.getElementById("grid");
+    const palette = document.getElementById("palette");
+    const gridSizeSlider = document.getElementById("grid-size-slider");
+    const xSlider = document.getElementById("x-slider");
+    const ySlider = document.getElementById("y-slider");
+
+    // Slider to choose grid size (16px to 1000px)
+    gridSizeSlider.addEventListener("input", (e) => {
+      const value = parseInt(e.target.value);
+      gridSizeX = gridSizeY = value;
+      updateGrid();
+    });
+
+    // Advanced version: X and Y sliders for width and height separately
+    xSlider.addEventListener("input", (e) => {
+      gridSizeX = parseInt(e.target.value);
+      updateGrid();
+    });
+
+    ySlider.addEventListener("input", (e) => {
+      gridSizeY = parseInt(e.target.value);
+      updateGrid();
+    });
+
+    // Create Grid based on size
+    function updateGrid() {
+      grid.innerHTML = ''; // Clear existing grid
+      grid.style.gridTemplateColumns = `repeat(${gridSizeX}, 20px)`;
+      grid.style.gridTemplateRows = `repeat(${gridSizeY}, 20px)`;
+
+      // Create new grid cells
+      for (let i = 0; i < gridSizeX * gridSizeY; i++) {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.dataset.index = i;
+        grid.appendChild(cell);
+      }
+    }
+
+    // Palette Interaction
+    palette.addEventListener("click", (e) => {
+      if (e.target.classList.contains("color")) {
+        currentColor = e.target.dataset.color;
+      }
+    });
+
+    // Create Room
+    document.getElementById("create-room").addEventListener("click", () => {
+      const roomName = document.getElementById("room-name").value;
+      const password = document.getElementById("room-password").value;
+      if (roomName && password) {
+        const roomRef = ref(db, `rooms/${roomName}`);
+        set(roomRef, { password, frames: { 0: {} } });
+        enterRoom(roomName);
+      }
+    });
+
+    // Join Room
+    document.getElementById("join-room").addEventListener("click", () => {
+      const roomName = document.getElementById("room-name").value;
+      const password = document.getElementById("room-password").value;
+      if (roomName && password) {
+        const roomRef = ref(db, `rooms/${roomName}`);
+        get(roomRef).then((snapshot) => {
+          if (snapshot.exists() && snapshot.val().password === password) {
+            enterRoom(roomName);
+          }
+        });
+      }
+    });
+
+    // Enter Room
+    function enterRoom(roomName) {
+      currentRoom = roomName;
+      roomUI.style.display = "none";
+      paintingUI.style.display = "block";
+      roomTitle.textContent = roomName;
+      loadFrame(0);
+    }
+
+    // Load Frame
+    function loadFrame(frame) {
+      const frameRef = ref(db, `rooms/${currentRoom}/frames/${frame}`);
+      onValue(frameRef, (snapshot) => {
+        const pixels = snapshot.val() || {};
+        grid.querySelectorAll(".cell").forEach((cell) => {
+          cell.style.backgroundColor = pixels[cell.dataset.index] || "white";
+        });
+      });
+    }
+
+    // Add Frame
+    document.getElementById("add-frame").addEventListener("click", () => {
+      frames.push({});
+      currentFrame = frames.length - 1;
+      loadFrame(currentFrame);
+    });
+
+    // Play Animation
+    document.getElementById("play-animation").addEventListener("click", () => {
+      let frameIndex = 0;
+      const interval = setInterval(() => {
+        if (frameIndex >= frames.length) {
+          clearInterval(interval);
+        } else {
+          loadFrame(frameIndex);
+          frameIndex++;
+        }
+      }, 500);
+    });
+
+    // Save Pixel to Database
+    grid.addEventListener("click", (e) => {
+      if (e.target.classList.contains("cell")) {
+        const index = e.target.dataset.index;
+        const frameRef = ref(db, `rooms/${currentRoom}/frames/${currentFrame}`);
+        update(frameRef, { [index]: currentColor });
+      }
+    });
+
+    // Initialize the grid with default size
+    updateGrid();
+  </script>
+</head>
+<body>
+  <h1>ArtForge - Collaborative Pixel Art Creator</h1>
+
+  <!-- Room UI -->
+  <div id="room-ui">
+    <input id="room-name" placeholder="Room Name" />
+    <input id="room-password" type="password" placeholder="Room Password" />
+    <button id="create-room">Create Room</button>
+    <button id="join-room">Join Room</button>
+  </div>
+
+  <!-- Painting UI -->
+  <div id="painting-ui" style="display: none;">
+    <h2>Room: <span id="room-title"></span></h2>
+
+    <!-- Grid Size Control -->
+    <div>
+      <label for="grid-size-slider">Grid Size (Width/Height): </label>
+      <input id="grid-size-slider" type="range" min="16" max="1000" step="16" value="16">
+    </div>
+
+    <!-- Advanced version: X and Y sliders -->
+    <div>
+      <label for="x-slider">Width (X): </label>
+      <input id="x-slider" type="range" min="16" max="1000" step="16" value="16">
+    </div>
+    <div>
+      <label for="y-slider">Height (Y): </label>
+      <input id="y-slider" type="range" min="16" max="1000" step="16" value="16">
+    </div>
+
+    <!-- Palette -->
+    <div id="palette">
+      <div class="color" style="background: red;" data-color="red"></div>
+      <div class="color" style="background: green;" data-color="green"></div>
+      <div class="color" style="background: blue;" data-color="blue"></div>
+      <div class="color" style="background: yellow;" data-color="yellow"></div>
+      <div class="color" style="background: black;" data-color="black"></div>
+      <div class="color" style="background: white;" data-color="white"></div>
+    </div>
+
+    <!-- Grid -->
+    <div id="grid"></div>
+
+    <!-- Animation Controls -->
+    <div id="animation-controls">
+      <button id="add-frame">Add Frame</button>
+      <button id="play-animation">Play Animation</button>
+    </div>
+  </div>
+</body>
+</html>
