@@ -24,7 +24,6 @@
       color: #333;
     }
 
-    /* Modern and clean design for the form */
     .form-container {
       background-color: #fff;
       padding: 30px;
@@ -87,10 +86,31 @@
       cursor: pointer;
     }
 
+    .auth-button {
+      margin-top: 10px;
+    }
+
+    #room-container {
+      margin: 20px;
+    }
+
+    #brush-size-container {
+      margin-top: 20px;
+    }
+
+    #public-board {
+      margin-top: 20px;
+    }
+
+    .brush-size {
+      margin: 5px;
+    }
+
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
+    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
 
     // Firebase config
     const firebaseConfig = {
@@ -107,6 +127,7 @@
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth();
+    const db = getDatabase();
 
     // DOM Elements
     const loginForm = document.getElementById("login-form");
@@ -118,8 +139,16 @@
     const loginButton = document.getElementById("login-button");
     const signupButton = document.getElementById("signup-button");
     const signOutButton = document.getElementById("signout-button");
+    const roomNameInput = document.getElementById("room-name");
+    const roomPasswordInput = document.getElementById("room-password");
+    const createRoomButton = document.getElementById("create-room");
+    const joinRoomButton = document.getElementById("join-room");
+    const brushSizeSlider = document.getElementById("brush-size");
+    const brushSizeDisplay = document.getElementById("brush-size-display");
+    const publicBoardCanvas = document.getElementById("public-board-canvas");
 
     let currentColor = "black";
+    let brushSize = 5;
 
     // Set up color palette
     const colors = ["red", "green", "blue", "yellow", "black", "white"];
@@ -156,7 +185,7 @@
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       ctx.fillStyle = currentColor;
-      ctx.fillRect(x, y, 5, 5);
+      ctx.fillRect(x, y, brushSize, brushSize);
     }
 
     // Handle color selection
@@ -166,96 +195,170 @@
       }
     });
 
+    // Handle Brush Size Selection
+    brushSizeSlider.addEventListener("input", (e) => {
+      brushSize = parseInt(e.target.value);
+      brushSizeDisplay.textContent = `Brush Size: ${brushSize}px`;
+    });
+
+    // Handle Room Creation and Joining
+    createRoomButton.addEventListener("click", (e) => {
+      const roomName = roomNameInput.value;
+      const roomPassword = roomPasswordInput.value;
+      if (roomName && roomPassword) {
+        set(ref(db, 'rooms/' + roomName), {
+          password: roomPassword,
+          createdBy: auth.currentUser ? auth.currentUser.email : "Guest",
+        });
+        alert("Room Created!");
+      }
+    });
+
+    joinRoomButton.addEventListener("click", (e) => {
+      const roomName = roomNameInput.value;
+      const roomPassword = roomPasswordInput.value;
+      get(ref(db, 'rooms/' + roomName)).then((snapshot) => {
+        if (snapshot.exists() && snapshot.val().password === roomPassword) {
+          alert("Joined Room Successfully!");
+        } else {
+          alert("Incorrect Room or Password");
+        }
+      });
+    });
+
+    // Create Public Board for Everyone to Draw
+    const publicBoardCtx = publicBoardCanvas.getContext("2d");
+    publicBoardCanvas.width = 500;
+    publicBoardCanvas.height = 400;
+
+    publicBoardCanvas.addEventListener("mousedown", (e) => {
+      painting = true;
+      drawPublicBoard(e);
+    });
+
+    publicBoardCanvas.addEventListener("mousemove", (e) => {
+      if (painting) {
+        drawPublicBoard(e);
+      }
+    });
+
+    publicBoardCanvas.addEventListener("mouseup", () => {
+      painting = false;
+    });
+
+    function drawPublicBoard(e) {
+      const rect = publicBoardCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      publicBoardCtx.fillStyle = currentColor;
+      publicBoardCtx.fillRect(x, y, brushSize, brushSize);
+    }
+
     // Firebase Auth: Sign Up
     signupButton.addEventListener("click", (e) => {
       e.preventDefault();
       const email = document.getElementById("signup-email").value;
       const password = document.getElementById("signup-password").value;
-
       createUserWithEmailAndPassword(auth, email, password)
         .then(() => {
-          alert("Signed Up!");
+          alert("Signed Up Successfully!");
         })
         .catch((error) => {
-          console.error(error.message);
+          alert(error.message);
         });
     });
 
-    // Firebase Auth: Sign In
+    // Firebase Auth: Login
     loginButton.addEventListener("click", (e) => {
       e.preventDefault();
       const email = document.getElementById("login-email").value;
       const password = document.getElementById("login-password").value;
-
       signInWithEmailAndPassword(auth, email, password)
         .then(() => {
-          alert("Logged In!");
+          alert("Logged In Successfully!");
         })
         .catch((error) => {
-          console.error(error.message);
+          alert(error.message);
         });
     });
 
-    // Sign Out functionality
+    // Sign Out
     signOutButton.addEventListener("click", () => {
-      signOut(auth)
-        .then(() => {
-          alert("Signed Out!");
-        })
-        .catch((error) => {
-          console.error(error.message);
-        });
+      signOut(auth).then(() => {
+        alert("Signed Out Successfully!");
+      }).catch((error) => {
+        alert(error.message);
+      });
     });
 
-    // Monitor auth state changes (for signed-in user)
+    // Auth State Change (for login/logout)
     onAuthStateChanged(auth, (user) => {
       if (user) {
-        // User is signed in
-        loginForm.style.display = "none";
-        signupForm.style.display = "none";
+        document.getElementById("canvas-container").style.display = "block";
         signOutButton.style.display = "block";
-        canvasContainer.style.display = "block";
       } else {
-        // User is signed out (guest mode)
-        loginForm.style.display = "none";
-        signupForm.style.display = "none";
+        document.getElementById("canvas-container").style.display = "none";
         signOutButton.style.display = "none";
-        canvasContainer.style.display = "block";  // Canvas accessible in guest mode
       }
     });
 
+    // Automatically use Guest Mode
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        alert("You are using Guest Mode");
+      }
+    });
   </script>
 </head>
 <body>
+  <h1>Welcome to ArtForge</h1>
 
-  <h1>ArtForge - Collaborative Pixel Art Creator</h1>
-
-  <!-- Sign Up Form (Initially Hidden) -->
-  <div id="signup-form" class="form-container" style="display:none;">
-    <h2>Sign Up</h2>
-    <input id="signup-email" type="email" placeholder="Email" />
-    <input id="signup-password" type="password" placeholder="Password" />
-    <button id="signup-button">Sign Up</button>
+  <div id="room-container">
+    <h2>Create/Join Room</h2>
+    <input type="text" id="room-name" placeholder="Room Name" />
+    <input type="password" id="room-password" placeholder="Password" />
+    <button id="create-room">Create Room</button>
+    <button id="join-room">Join Room</button>
   </div>
 
-  <!-- Login Form (Initially Hidden) -->
-  <div id="login-form" class="form-container" style="display:none;">
-    <h2>Login</h2>
-    <input id="login-email" type="email" placeholder="Email" />
-    <input id="login-password" type="password" placeholder="Password" />
-    <button id="login-button">Login</button>
+  <!-- Brush Size Selection -->
+  <div id="brush-size-container">
+    <label>Brush Size: </label>
+    <input id="brush-size" type="range" min="1" max="64" value="5" />
+    <span id="brush-size-display">Brush Size: 5px</span>
   </div>
 
-  <!-- Canvas (Visible to All Users) -->
-  <div id="canvas-container">
+  <div id="canvas-container" style="display:none;">
     <canvas id="paint-canvas"></canvas>
   </div>
 
-  <!-- Sign out Button (Only visible if logged in) -->
-  <button id="signout-button" style="display:none;">Sign Out</button>
+  <!-- Public Drawing Board -->
+  <h2>Public Board</h2>
+  <canvas id="public-board-canvas"></canvas>
 
-  <!-- Palette -->
   <div id="palette"></div>
+
+  <div class="auth-button">
+    <button id="signup-button">Sign Up</button>
+    <button id="login-button">Log In</button>
+  </div>
+
+  <!-- Forms -->
+  <div class="form-container" id="login-form">
+    <h2>Login</h2>
+    <input type="email" id="login-email" placeholder="Email" />
+    <input type="password" id="login-password" placeholder="Password" />
+    <button id="login-button">Log In</button>
+  </div>
+
+  <div class="form-container" id="signup-form">
+    <h2>Sign Up</h2>
+    <input type="email" id="signup-email" placeholder="Email" />
+    <input type="password" id="signup-password" placeholder="Password" />
+    <button id="signup-button">Sign Up</button>
+  </div>
+
+  <button id="signout-button" style="display:none;">Sign Out</button>
 
 </body>
 </html>
