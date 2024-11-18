@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ArtForge - Collaborative Pixel Art Creator</title>
   <style>
+    /* Basic Styles */
     * {
       box-sizing: border-box;
       margin: 0;
@@ -26,6 +27,7 @@
       margin-bottom: 20px;
     }
 
+    /* Form container */
     #room-container {
       margin-top: 20px;
       background-color: white;
@@ -62,6 +64,7 @@
       background-color: #45a049;
     }
 
+    /* Canvas Section */
     #canvas-container {
       margin-top: 30px;
       background-color: #ffffff;
@@ -79,6 +82,17 @@
       border-radius: 5px;
     }
 
+    /* Brush Size Section */
+    #brush-size-container {
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    #brush-size {
+      width: 100%;
+    }
+
+    /* Color Palette Section */
     #palette {
       margin-top: 20px;
     }
@@ -98,15 +112,7 @@
       transform: scale(1.5);
     }
 
-    #brush-size-container {
-      margin-top: 30px;
-      text-align: center;
-    }
-
-    #brush-size {
-      width: 100%;
-    }
-
+    /* Auth Buttons */
     .auth-button {
       margin-top: 20px;
       display: flex;
@@ -137,11 +143,15 @@
       display: none;
     }
 
+    #room-status {
+      margin-top: 10px;
+      color: #333;
+    }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-    import { getDatabase, ref, set, get, remove } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+    import { getDatabase, ref, set, get, remove, update } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
 
     // Firebase configuration
     const firebaseConfig = {
@@ -175,7 +185,6 @@
     const deleteRoomButton = document.getElementById("delete-room");
     const brushSizeSlider = document.getElementById("brush-size");
     const brushSizeDisplay = document.getElementById("brush-size-display");
-    const publicBoardCanvas = document.getElementById("public-board-canvas");
     const roomStatus = document.getElementById("room-status");
 
     let currentColor = "black";
@@ -245,147 +254,149 @@
     createRoomButton.addEventListener("click", (e) => {
       const roomName = roomNameInput.value;
       const roomPassword = roomPasswordInput.value;
+      const user = auth.currentUser ? auth.currentUser.email : "Guest";
+
       if (roomName && roomPassword) {
-        const user = auth.currentUser ? auth.currentUser.email : "Guest";
-        set(ref(db, 'rooms/' + roomName), {
-          password: roomPassword,
-          createdBy: user,
-          members: [user],
+        const roomRef = ref(db, "rooms/" + roomName);
+        get(roomRef).then((snapshot) => {
+          if (!snapshot.exists()) {
+            set(roomRef, {
+              createdBy: user,
+              password: roomPassword,
+              members: [user]
+            }).then(() => {
+              currentRoom = roomName;
+              roomStatus.textContent = `Created Room: ${roomName} (You are the Host)`;
+            });
+          } else {
+            alert("Room already exists!");
+          }
         });
-        alert("Room Created!");
       }
     });
 
     joinRoomButton.addEventListener("click", (e) => {
       const roomName = roomNameInput.value;
       const roomPassword = roomPasswordInput.value;
-      if (roomName && roomPassword) {
-        get(ref(db, 'rooms/' + roomName)).then((snapshot) => {
-          const roomData = snapshot.val();
-          if (roomData && roomData.password === roomPassword) {
-            currentRoom = roomName;
-            roomStatus.textContent = `Joined Room: ${roomName}`;
 
-            // Display host/member status
-            const user = auth.currentUser ? auth.currentUser.email : "Guest";
-            if (roomData.createdBy === user) {
-              isHost = true;
-              roomStatus.textContent = `You are the Host of the room: ${roomName}`;
+      if (roomName && roomPassword) {
+        const roomRef = ref(db, "rooms/" + roomName);
+        get(roomRef).then((snapshot) => {
+          if (snapshot.exists()) {
+            const roomData = snapshot.val();
+            if (roomData.password === roomPassword) {
+              currentRoom = roomName;
+              roomStatus.textContent = `Joined Room: ${roomName}`;
             } else {
-              isHost = false;
-              roomStatus.textContent = `You are a member of the room: ${roomName}`;
+              alert("Incorrect password.");
             }
-            publicBoardCanvas.style.display = "none";
-            canvasContainer.style.display = "block";
           } else {
-            alert("Room not found or incorrect password!");
+            alert("Room not found.");
           }
         });
       }
     });
 
-    // Delete Room functionality
     deleteRoomButton.addEventListener("click", (e) => {
       if (isHost && currentRoom) {
-        remove(ref(db, 'rooms/' + currentRoom)).then(() => {
-          alert("Room deleted!");
+        const roomRef = ref(db, "rooms/" + currentRoom);
+        remove(roomRef).then(() => {
+          roomStatus.textContent = "Room deleted.";
           currentRoom = null;
-          publicBoardCanvas.style.display = "block";
-          canvasContainer.style.display = "none";
-          roomStatus.textContent = "";
-        }).catch((error) => {
-          alert("Error deleting room: " + error.message);
+          isHost = false;
         });
-      } else {
-        alert("You must be the host to delete the room.");
       }
-    });
-
-    // Show login/signup form on button click
-    loginButton.addEventListener("click", () => {
-      document.getElementById("login-form").classList.add("active");
-      document.getElementById("signup-form").classList.remove("active");
-    });
-
-    signupButton.addEventListener("click", () => {
-      document.getElementById("signup-form").classList.add("active");
-      document.getElementById("login-form").classList.remove("active");
     });
 
     // Firebase Authentication
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        document.getElementById("canvas-container").style.display = "block";
-        signOutButton.style.display = "block";
-      } else {
-        document.getElementById("canvas-container").style.display = "none";
-        signOutButton.style.display = "none";
-      }
+    loginButton.addEventListener("click", () => {
+      const email = document.getElementById("login-email").value;
+      const password = document.getElementById("login-password").value;
+
+      signInWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          alert("Logged in successfully!");
+        })
+        .catch((error) => {
+          alert(error.message);
+        });
+    });
+
+    signupButton.addEventListener("click", () => {
+      const email = document.getElementById("signup-email").value;
+      const password = document.getElementById("signup-password").value;
+
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          alert("Account created successfully!");
+        })
+        .catch((error) => {
+          alert(error.message);
+        });
     });
 
     signOutButton.addEventListener("click", () => {
-      signOut(auth).then(() => {
-        alert("Signed out successfully");
-      }).catch((error) => {
-        alert("Error signing out: " + error.message);
-      });
+      signOut(auth)
+        .then(() => {
+          alert("Logged out successfully!");
+        })
+        .catch((error) => {
+          alert(error.message);
+        });
     });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        document.getElementById("auth-section").style.display = "none";
+        document.getElementById("room-container").style.display = "block";
+        signOutButton.style.display = "inline";
+      } else {
+        document.getElementById("auth-section").style.display = "block";
+        document.getElementById("room-container").style.display = "none";
+      }
+    });
+
   </script>
 </head>
 <body>
-  <h1>Welcome to ArtForge</h1>
+  <h1>ArtForge - Collaborative Pixel Art Creator</h1>
 
-  <!-- Room Section -->
+  <div id="auth-section">
+    <div class="form-container active">
+      <input type="email" id="login-email" placeholder="Email" />
+      <input type="password" id="login-password" placeholder="Password" />
+      <button id="login-button">Login</button>
+    </div>
+    <div class="form-container">
+      <input type="email" id="signup-email" placeholder="Email" />
+      <input type="password" id="signup-password" placeholder="Password" />
+      <button id="signup-button">Sign Up</button>
+    </div>
+  </div>
+
   <div id="room-container">
-    <h2>Create/Join Room</h2>
     <input type="text" id="room-name" placeholder="Room Name" />
-    <input type="password" id="room-password" placeholder="Password" />
+    <input type="password" id="room-password" placeholder="Room Password" />
     <button id="create-room">Create Room</button>
     <button id="join-room">Join Room</button>
     <button id="delete-room">Delete Room</button>
-    <p id="room-status"></p>
+
+    <div id="room-status"></div>
   </div>
 
-  <!-- Brush Size Selection -->
-  <div id="brush-size-container">
-    <label>Brush Size:</label>
-    <input id="brush-size" type="range" min="1" max="64" value="5" />
-    <span id="brush-size-display">Brush Size: 5px</span>
-  </div>
-
-  <!-- Canvas Section -->
-  <div id="canvas-container" style="display:none;">
+  <div id="canvas-container">
     <canvas id="paint-canvas"></canvas>
   </div>
 
-  <!-- Public Drawing Board -->
-  <h2>Public Board</h2>
-  <canvas id="public-board-canvas"></canvas>
+  <div id="brush-size-container">
+    <input type="range" id="brush-size" min="1" max="50" value="5" />
+    <p id="brush-size-display">Brush Size: 5px</p>
+  </div>
 
   <div id="palette"></div>
 
-  <!-- Auth Section -->
   <div class="auth-button">
-    <button id="signup-button">Sign Up</button>
-    <button id="login-button">Log In</button>
+    <button id="signout-button">Sign Out</button>
   </div>
-
-  <!-- Login Form -->
-  <div class="form-container" id="login-form">
-    <h2>Login</h2>
-    <input type="email" id="login-email" placeholder="Email" />
-    <input type="password" id="login-password" placeholder="Password" />
-    <button id="login-submit">Log In</button>
-  </div>
-
-  <!-- Signup Form -->
-  <div class="form-container" id="signup-form">
-    <h2>Sign Up</h2>
-    <input type="email" id="signup-email" placeholder="Email" />
-    <input type="password" id="signup-password" placeholder="Password" />
-    <button id="signup-submit">Sign Up</button>
-  </div>
-
-  <button id="signout-button" style="display:none;">Sign Out</button>
 </body>
 </html>
