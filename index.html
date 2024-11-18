@@ -9,24 +9,89 @@
       font-family: Arial, sans-serif;
       margin: 0;
       padding: 0;
+      background-color: #f0f0f0;
       text-align: center;
-    }
-    #room-ui, #painting-ui {
-      margin-top: 20px;
-    }
-    #grid {
-      display: grid;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       justify-content: center;
-      margin-top: 10px;
-      border: 1px solid #ddd;
+      height: 100vh;
     }
-    .cell {
-      border: 1px solid #eee;
+
+    h1 {
+      font-size: 2rem;
+      margin-top: 10px;
+      color: #333;
+    }
+
+    /* Modern and clean design for the form */
+    .form-container {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      margin: 20px;
+    }
+
+    input {
+      padding: 10px;
+      width: 250px;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      padding: 10px 20px;
+      width: 100%;
+      margin: 10px 0;
+      border-radius: 5px;
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      font-size: 1rem;
       cursor: pointer;
     }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    #canvas-container {
+      width: 80%;
+      height: 400px;
+      background-color: white;
+      border: 1px solid #ddd;
+      margin-top: 20px;
+      border-radius: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #paint-canvas {
+      border-radius: 5px;
+    }
+
+    .auth-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .auth-button {
+      background-color: #3b82f6;
+      color: white;
+    }
+
+    .auth-button:hover {
+      background-color: #2563eb;
+    }
+
     #palette {
       margin-top: 20px;
     }
+
     .color {
       display: inline-block;
       width: 30px;
@@ -35,22 +100,14 @@
       border: 1px solid black;
       cursor: pointer;
     }
-    #animation-controls {
-      margin-top: 20px;
-    }
-    #grid-size-slider {
-      margin-top: 20px;
-    }
-    #x-slider, #y-slider {
-      margin-top: 20px;
-    }
+
   </style>
   <script type="module">
-    // Import the functions you need from the Firebase SDK
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
     import { getDatabase, ref, set, get, child, onValue, update } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
 
-    // Your web app's Firebase configuration
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyC-wJdotEQqjlpCMrmBXaa7VCxTnG_0ksw",
       authDomain: "eeeeeeee-5fcd8.firebaseapp.com",
@@ -65,192 +122,165 @@
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-
-    // Variables
-    let currentColor = "black";
-    let currentRoom = null;
-    let frames = [[]];
-    let currentFrame = 0;
-    let gridSizeX = 16;
-    let gridSizeY = 16;
+    const auth = getAuth();
 
     // DOM Elements
-    const roomUI = document.getElementById("room-ui");
-    const paintingUI = document.getElementById("painting-ui");
-    const roomTitle = document.getElementById("room-title");
-    const grid = document.getElementById("grid");
+    const loginForm = document.getElementById("login-form");
+    const signupForm = document.getElementById("signup-form");
+    const canvasContainer = document.getElementById("canvas-container");
+    const paintCanvas = document.getElementById("paint-canvas");
+    const ctx = paintCanvas.getContext("2d");
     const palette = document.getElementById("palette");
-    const gridSizeSlider = document.getElementById("grid-size-slider");
-    const xSlider = document.getElementById("x-slider");
-    const ySlider = document.getElementById("y-slider");
+    const loginButton = document.getElementById("login-button");
+    const signupButton = document.getElementById("signup-button");
+    const guestButton = document.getElementById("guest-button");
+    const signOutButton = document.getElementById("signout-button");
 
-    // Slider to choose grid size (16px to 1000px)
-    gridSizeSlider.addEventListener("input", (e) => {
-      const value = parseInt(e.target.value);
-      gridSizeX = gridSizeY = value;
-      updateGrid();
+    let currentColor = "black";
+
+    // Set up color palette
+    const colors = ["red", "green", "blue", "yellow", "black", "white"];
+    colors.forEach(color => {
+      const colorDiv = document.createElement("div");
+      colorDiv.classList.add("color");
+      colorDiv.style.backgroundColor = color;
+      colorDiv.dataset.color = color;
+      palette.appendChild(colorDiv);
     });
 
-    // Advanced version: X and Y sliders for width and height separately
-    xSlider.addEventListener("input", (e) => {
-      gridSizeX = parseInt(e.target.value);
-      updateGrid();
+    // Canvas drawing functionality
+    let painting = false;
+    paintCanvas.width = 500;
+    paintCanvas.height = 400;
+
+    paintCanvas.addEventListener("mousedown", (e) => {
+      painting = true;
+      draw(e);
     });
 
-    ySlider.addEventListener("input", (e) => {
-      gridSizeY = parseInt(e.target.value);
-      updateGrid();
-    });
-
-    // Create Grid based on size
-    function updateGrid() {
-      grid.innerHTML = ''; // Clear existing grid
-      grid.style.gridTemplateColumns = `repeat(${gridSizeX}, 20px)`;
-      grid.style.gridTemplateRows = `repeat(${gridSizeY}, 20px)`;
-
-      // Create new grid cells
-      for (let i = 0; i < gridSizeX * gridSizeY; i++) {
-        const cell = document.createElement("div");
-        cell.classList.add("cell");
-        cell.dataset.index = i;
-        grid.appendChild(cell);
+    paintCanvas.addEventListener("mousemove", (e) => {
+      if (painting) {
+        draw(e);
       }
+    });
+
+    paintCanvas.addEventListener("mouseup", () => {
+      painting = false;
+    });
+
+    function draw(e) {
+      const rect = paintCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      ctx.fillStyle = currentColor;
+      ctx.fillRect(x, y, 5, 5);
     }
 
-    // Palette Interaction
+    // Handle color selection
     palette.addEventListener("click", (e) => {
       if (e.target.classList.contains("color")) {
         currentColor = e.target.dataset.color;
       }
     });
 
-    // Create Room
-    document.getElementById("create-room").addEventListener("click", () => {
-      const roomName = document.getElementById("room-name").value;
-      const password = document.getElementById("room-password").value;
-      if (roomName && password) {
-        const roomRef = ref(db, `rooms/${roomName}`);
-        set(roomRef, { password, frames: { 0: {} } });
-        enterRoom(roomName);
-      }
-    });
+    // Firebase Auth: Sign Up
+    signupButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      const email = document.getElementById("signup-email").value;
+      const password = document.getElementById("signup-password").value;
 
-    // Join Room
-    document.getElementById("join-room").addEventListener("click", () => {
-      const roomName = document.getElementById("room-name").value;
-      const password = document.getElementById("room-password").value;
-      if (roomName && password) {
-        const roomRef = ref(db, `rooms/${roomName}`);
-        get(roomRef).then((snapshot) => {
-          if (snapshot.exists() && snapshot.val().password === password) {
-            enterRoom(roomName);
-          }
+      createUserWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          alert("Signed Up!");
+        })
+        .catch((error) => {
+          console.error(error.message);
         });
-      }
     });
 
-    // Enter Room
-    function enterRoom(roomName) {
-      currentRoom = roomName;
-      roomUI.style.display = "none";
-      paintingUI.style.display = "block";
-      roomTitle.textContent = roomName;
-      loadFrame(0);
-    }
+    // Firebase Auth: Sign In
+    loginButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      const email = document.getElementById("login-email").value;
+      const password = document.getElementById("login-password").value;
 
-    // Load Frame
-    function loadFrame(frame) {
-      const frameRef = ref(db, `rooms/${currentRoom}/frames/${frame}`);
-      onValue(frameRef, (snapshot) => {
-        const pixels = snapshot.val() || {};
-        grid.querySelectorAll(".cell").forEach((cell) => {
-          cell.style.backgroundColor = pixels[cell.dataset.index] || "white";
+      signInWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          alert("Logged In!");
+        })
+        .catch((error) => {
+          console.error(error.message);
         });
-      });
-    }
-
-    // Add Frame
-    document.getElementById("add-frame").addEventListener("click", () => {
-      frames.push({});
-      currentFrame = frames.length - 1;
-      loadFrame(currentFrame);
     });
 
-    // Play Animation
-    document.getElementById("play-animation").addEventListener("click", () => {
-      let frameIndex = 0;
-      const interval = setInterval(() => {
-        if (frameIndex >= frames.length) {
-          clearInterval(interval);
-        } else {
-          loadFrame(frameIndex);
-          frameIndex++;
-        }
-      }, 500);
+    // Sign Out functionality
+    signOutButton.addEventListener("click", () => {
+      signOut(auth)
+        .then(() => {
+          alert("Signed Out!");
+        })
+        .catch((error) => {
+          console.error(error.message);
+        });
     });
 
-    // Save Pixel to Database
-    grid.addEventListener("click", (e) => {
-      if (e.target.classList.contains("cell")) {
-        const index = e.target.dataset.index;
-        const frameRef = ref(db, `rooms/${currentRoom}/frames/${currentFrame}`);
-        update(frameRef, { [index]: currentColor });
+    // Guest Mode
+    guestButton.addEventListener("click", () => {
+      alert("You're using Guest Mode!");
+    });
+
+    // Monitor auth state changes (for signed-in user)
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is signed in
+        loginForm.style.display = "none";
+        signupForm.style.display = "none";
+        signOutButton.style.display = "block";
+        canvasContainer.style.display = "block";
+      } else {
+        // User is signed out
+        loginForm.style.display = "block";
+        signupForm.style.display = "block";
+        signOutButton.style.display = "none";
+        canvasContainer.style.display = "none";
       }
     });
 
-    // Initialize the grid with default size
-    updateGrid();
   </script>
 </head>
 <body>
+
   <h1>ArtForge - Collaborative Pixel Art Creator</h1>
 
-  <!-- Room UI -->
-  <div id="room-ui">
-    <input id="room-name" placeholder="Room Name" />
-    <input id="room-password" type="password" placeholder="Room Password" />
-    <button id="create-room">Create Room</button>
-    <button id="join-room">Join Room</button>
+  <!-- Sign Up Form -->
+  <div id="signup-form" class="form-container">
+    <h2>Sign Up</h2>
+    <input id="signup-email" type="email" placeholder="Email" />
+    <input id="signup-password" type="password" placeholder="Password" />
+    <button id="signup-button">Sign Up</button>
   </div>
 
-  <!-- Painting UI -->
-  <div id="painting-ui" style="display: none;">
-    <h2>Room: <span id="room-title"></span></h2>
-
-    <!-- Grid Size Control -->
-    <div>
-      <label for="grid-size-slider">Grid Size (Width/Height): </label>
-      <input id="grid-size-slider" type="range" min="16" max="1000" step="16" value="16">
-    </div>
-
-    <!-- Advanced version: X and Y sliders -->
-    <div>
-      <label for="x-slider">Width (X): </label>
-      <input id="x-slider" type="range" min="16" max="1000" step="16" value="16">
-    </div>
-    <div>
-      <label for="y-slider">Height (Y): </label>
-      <input id="y-slider" type="range" min="16" max="1000" step="16" value="16">
-    </div>
-
-    <!-- Palette -->
-    <div id="palette">
-      <div class="color" style="background: red;" data-color="red"></div>
-      <div class="color" style="background: green;" data-color="green"></div>
-      <div class="color" style="background: blue;" data-color="blue"></div>
-      <div class="color" style="background: yellow;" data-color="yellow"></div>
-      <div class="color" style="background: black;" data-color="black"></div>
-      <div class="color" style="background: white;" data-color="white"></div>
-    </div>
-
-    <!-- Grid -->
-    <div id="grid"></div>
-
-    <!-- Animation Controls -->
-    <div id="animation-controls">
-      <button id="add-frame">Add Frame</button>
-      <button id="play-animation">Play Animation</button>
-    </div>
+  <!-- Login Form -->
+  <div id="login-form" class="form-container">
+    <h2>Login</h2>
+    <input id="login-email" type="email" placeholder="Email" />
+    <input id="login-password" type="password" placeholder="Password" />
+    <button id="login-button">Login</button>
   </div>
+
+  <!-- Guest Mode -->
+  <button id="guest-button" class="auth-button">Continue as Guest</button>
+
+  <!-- Canvas -->
+  <div id="canvas-container" style="display:none;">
+    <canvas id="paint-canvas"></canvas>
+  </div>
+
+  <!-- Sign out Button -->
+  <button id="signout-button" style="display:none;">Sign Out</button>
+
+  <!-- Palette -->
+  <div id="palette"></div>
+
 </body>
 </html>
