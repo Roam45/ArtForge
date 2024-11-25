@@ -49,6 +49,7 @@
     .preset-brushes {
       display: flex;
       gap: 5px;
+      margin-top: 10px; /* Moved down */
     }
     .preset-brush {
       width: 30px;
@@ -59,6 +60,19 @@
     }
     .preset-brush:hover {
       border: 2px solid #333;
+    }
+    .color-history {
+      display: flex;
+      gap: 5px;
+      margin-top: 10px;
+      overflow-x: auto; /* Allow horizontal scrolling */
+    }
+    .color-history div {
+      width: 30px;
+      height: 30px;
+      border: 2px solid transparent;
+      border-radius: 5px;
+      cursor: pointer;
     }
     canvas {
       flex-grow: 1;
@@ -103,6 +117,10 @@
       <button id="eraserTool">Eraser</button>
     </div>
   </header>
+  
+  <!-- Color History -->
+  <div class="color-history" id="colorHistory"></div>
+
   <div class="preset-brushes">
     <div class="preset-brush" style="background: red;" data-color="#ff0000" data-size="10"></div>
     <div class="preset-brush" style="background: green;" data-color="#00ff00" data-size="20"></div>
@@ -110,7 +128,9 @@
     <div class="preset-brush" style="background: yellow;" data-color="#ffff00" data-size="15"></div>
     <div class="preset-brush" style="background: purple;" data-color="#800080" data-size="25"></div>
   </div>
+
   <canvas id="paintCanvas"></canvas>
+
   <footer>
     Contact me at <a href="mailto:beggadsbegone@gmail.com">beggadsbegone@gmail.com</a>
   </footer>
@@ -126,10 +146,12 @@
     const saveDrawing = document.getElementById('saveDrawing');
     const eraserTool = document.getElementById('eraserTool');
     const presetBrushes = document.querySelectorAll('.preset-brush');
+    const colorHistoryContainer = document.getElementById('colorHistory');
 
     const canvasBackgroundColor = "#ffffff"; // Canvas background color (white)
     let currentColor = colorPicker.value; // Initially selected color
     let eraserActive = false; // Track whether the eraser is active
+    let colorHistory = []; // Store color history
 
     // Set canvas size
     function resizeCanvas() {
@@ -238,7 +260,26 @@
     // Add current color to color history
     colorPicker.addEventListener('input', (event) => {
       currentColor = event.target.value;
+      if (!colorHistory.includes(currentColor)) {
+        colorHistory.unshift(currentColor);
+        if (colorHistory.length > 10) colorHistory.pop(); // Limit history to 10 colors
+        updateColorHistory();
+      }
     });
+
+    // Update the color history display
+    function updateColorHistory() {
+      colorHistoryContainer.innerHTML = '';
+      colorHistory.forEach(color => {
+        const colorDiv = document.createElement('div');
+        colorDiv.style.backgroundColor = color;
+        colorDiv.addEventListener('click', () => {
+          currentColor = color;
+          colorPicker.value = color;
+        });
+        colorHistoryContainer.appendChild(colorDiv);
+      });
+    }
 
     // Toggle eraser tool
     eraserTool.addEventListener('click', () => {
