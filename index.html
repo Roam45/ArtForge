@@ -12,14 +12,14 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
-      background: #f4f4f4;
+      background: #e8f5e9; /* Light Green background */
     }
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 10px 20px;
-      background: #673ab7;
+      background: #388e3c; /* Dark Green header */
       color: white;
     }
     header h1 {
@@ -59,15 +59,34 @@
     .preset-brush:hover {
       border: 2px solid #333;
     }
+    .history {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .history div {
+      width: 40px;
+      height: 40px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .brush-history {
+      display: flex;
+      gap: 5px;
+    }
+    .color-history {
+      display: flex;
+      gap: 5px;
+    }
     canvas {
       flex-grow: 1;
-      border: 2px solid #ddd;
+      border: 2px solid #388e3c;
       margin: 10px;
       border-radius: 10px;
       background: white;
     }
     footer {
-      background: #673ab7;
+      background: #388e3c;
       color: white;
       text-align: center;
       padding: 10px;
@@ -99,6 +118,7 @@
       </label>
       <button id="clearCanvas">Clear</button>
       <button id="saveDrawing">Save</button>
+      <button id="eraserTool">Eraser</button>
     </div>
   </header>
   <div class="preset-brushes">
@@ -107,6 +127,16 @@
     <div class="preset-brush" style="background: blue;" data-color="#0000ff" data-size="30"></div>
     <div class="preset-brush" style="background: yellow;" data-color="#ffff00" data-size="15"></div>
     <div class="preset-brush" style="background: purple;" data-color="#800080" data-size="25"></div>
+  </div>
+  <div class="history">
+    <div class="brush-history">
+      <h4>Brush History</h4>
+      <div id="brushHistoryContainer"></div>
+    </div>
+    <div class="color-history">
+      <h4>Color History</h4>
+      <div id="colorHistoryContainer"></div>
+    </div>
   </div>
   <canvas id="paintCanvas"></canvas>
   <footer>
@@ -122,7 +152,15 @@
     const touchModeCheckbox = document.getElementById('touchMode');
     const clearCanvas = document.getElementById('clearCanvas');
     const saveDrawing = document.getElementById('saveDrawing');
+    const eraserTool = document.getElementById('eraserTool');
     const presetBrushes = document.querySelectorAll('.preset-brush');
+    const brushHistoryContainer = document.getElementById('brushHistoryContainer');
+    const colorHistoryContainer = document.getElementById('colorHistoryContainer');
+
+    const canvasBackgroundColor = "#ffffff"; // Canvas background color (white)
+    let currentColor = colorPicker.value; // Initially selected color
+    let brushHistory = [];
+    let colorHistory = [];
 
     // Set canvas size
     function resizeCanvas() {
@@ -135,6 +173,7 @@
     // Variables for drawing
     let painting = false;
     let touchMode = false;
+    let eraserActive = false; // Track whether the eraser is active
 
     // Start drawing
     function startPainting(event) {
@@ -156,7 +195,7 @@
       const y = event.clientY - canvas.offsetTop;
 
       ctx.lineWidth = brushSize.value;
-      ctx.strokeStyle = colorPicker.value;
+      ctx.strokeStyle = eraserActive ? canvasBackgroundColor : currentColor; // Use background color for eraser
       ctx.lineCap = brushType.value === 'round' ? 'round' : 'butt';
 
       ctx.lineTo(x, y);
@@ -181,10 +220,65 @@
       brush.addEventListener('click', () => {
         const color = brush.getAttribute('data-color');
         const size = brush.getAttribute('data-size');
+        currentColor = color;
         colorPicker.value = color;
         brushSize.value = size;
+        addToBrushHistory(color, size);
       });
     });
+
+    // Add brush to history
+    function addToBrushHistory(color, size) {
+      if (brushHistory.length >= 5) {
+        brushHistory.shift(); // Remove the oldest brush
+      }
+      brushHistory.push({ color, size });
+      updateBrushHistory();
+    }
+
+    // Add color to history
+    function addToColorHistory(color) {
+      if (colorHistory.length >= 5) {
+        colorHistory.shift(); // Remove the oldest color
+      }
+      colorHistory.push(color);
+      updateColorHistory();
+    }
+
+    // Update brush history UI
+    function updateBrushHistory() {
+      brushHistoryContainer.innerHTML = '';
+      brushHistory.forEach((brush, index) => {
+        const brushElement = document.createElement('div');
+        brushElement.style.background = brush.color;
+        brushElement.style.width = `${brush.size}px`;
+        brushElement.style.height = `${brush.size}px`;
+        brushElement.style.borderRadius = '5px';
+        brushElement.addEventListener('click', () => {
+          currentColor = brush.color;
+          colorPicker.value = brush.color;
+          brushSize.value = brush.size;
+        });
+        brushHistoryContainer.appendChild(brushElement);
+      });
+    }
+
+    // Update color history UI
+    function updateColorHistory() {
+      colorHistoryContainer.innerHTML = '';
+      colorHistory.forEach((color) => {
+        const colorElement = document.createElement('div');
+        colorElement.style.background = color;
+        colorElement.style.width = '40px';
+        colorElement.style.height = '40px';
+        colorElement.style.borderRadius = '5px';
+        colorElement.addEventListener('click', () => {
+          currentColor = color;
+          colorPicker.value = color;
+        });
+        colorHistoryContainer.appendChild(colorElement);
+      });
+    }
 
     // Event listeners
     canvas.addEventListener('mousedown', startPainting);
@@ -224,6 +318,21 @@
         img.onload = () => {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         };
+      }
+    });
+
+    // Add current color to color history
+    colorPicker.addEventListener('input', (event) => {
+      currentColor = event.target.value;
+      addToColorHistory(currentColor);
+    });
+
+    // Toggle eraser tool
+    eraserTool.addEventListener('click', () => {
+      eraserActive = !eraserActive;
+      eraserTool.style.backgroundColor = eraserActive ? '#f44336' : '#ffffff'; // Highlight eraser button
+      if (eraserActive) {
+        currentColor = canvasBackgroundColor; // Set current color to background color for eraser
       }
     });
   </script>
