@@ -29,6 +29,7 @@
     .tools {
       display: flex;
       gap: 10px;
+      flex-wrap: wrap;
     }
     .tools button, .tools select, .tools input {
       padding: 8px 12px;
@@ -58,25 +59,6 @@
     }
     .preset-brush:hover {
       border: 2px solid #333;
-    }
-    .history {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .history div {
-      width: 40px;
-      height: 40px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    .brush-history {
-      display: flex;
-      gap: 5px;
-    }
-    .color-history {
-      display: flex;
-      gap: 5px;
     }
     canvas {
       flex-grow: 1;
@@ -128,16 +110,6 @@
     <div class="preset-brush" style="background: yellow;" data-color="#ffff00" data-size="15"></div>
     <div class="preset-brush" style="background: purple;" data-color="#800080" data-size="25"></div>
   </div>
-  <div class="history">
-    <div class="brush-history">
-      <h4>Brush History</h4>
-      <div id="brushHistoryContainer"></div>
-    </div>
-    <div class="color-history">
-      <h4>Color History</h4>
-      <div id="colorHistoryContainer"></div>
-    </div>
-  </div>
   <canvas id="paintCanvas"></canvas>
   <footer>
     Contact me at <a href="mailto:beggadsbegone@gmail.com">beggadsbegone@gmail.com</a>
@@ -154,13 +126,10 @@
     const saveDrawing = document.getElementById('saveDrawing');
     const eraserTool = document.getElementById('eraserTool');
     const presetBrushes = document.querySelectorAll('.preset-brush');
-    const brushHistoryContainer = document.getElementById('brushHistoryContainer');
-    const colorHistoryContainer = document.getElementById('colorHistoryContainer');
 
     const canvasBackgroundColor = "#ffffff"; // Canvas background color (white)
     let currentColor = colorPicker.value; // Initially selected color
-    let brushHistory = [];
-    let colorHistory = [];
+    let eraserActive = false; // Track whether the eraser is active
 
     // Set canvas size
     function resizeCanvas() {
@@ -173,7 +142,6 @@
     // Variables for drawing
     let painting = false;
     let touchMode = false;
-    let eraserActive = false; // Track whether the eraser is active
 
     // Start drawing
     function startPainting(event) {
@@ -223,62 +191,8 @@
         currentColor = color;
         colorPicker.value = color;
         brushSize.value = size;
-        addToBrushHistory(color, size);
       });
     });
-
-    // Add brush to history
-    function addToBrushHistory(color, size) {
-      if (brushHistory.length >= 5) {
-        brushHistory.shift(); // Remove the oldest brush
-      }
-      brushHistory.push({ color, size });
-      updateBrushHistory();
-    }
-
-    // Add color to history
-    function addToColorHistory(color) {
-      if (colorHistory.length >= 5) {
-        colorHistory.shift(); // Remove the oldest color
-      }
-      colorHistory.push(color);
-      updateColorHistory();
-    }
-
-    // Update brush history UI
-    function updateBrushHistory() {
-      brushHistoryContainer.innerHTML = '';
-      brushHistory.forEach((brush, index) => {
-        const brushElement = document.createElement('div');
-        brushElement.style.background = brush.color;
-        brushElement.style.width = `${brush.size}px`;
-        brushElement.style.height = `${brush.size}px`;
-        brushElement.style.borderRadius = '5px';
-        brushElement.addEventListener('click', () => {
-          currentColor = brush.color;
-          colorPicker.value = brush.color;
-          brushSize.value = brush.size;
-        });
-        brushHistoryContainer.appendChild(brushElement);
-      });
-    }
-
-    // Update color history UI
-    function updateColorHistory() {
-      colorHistoryContainer.innerHTML = '';
-      colorHistory.forEach((color) => {
-        const colorElement = document.createElement('div');
-        colorElement.style.background = color;
-        colorElement.style.width = '40px';
-        colorElement.style.height = '40px';
-        colorElement.style.borderRadius = '5px';
-        colorElement.addEventListener('click', () => {
-          currentColor = color;
-          colorPicker.value = color;
-        });
-        colorHistoryContainer.appendChild(colorElement);
-      });
-    }
 
     // Event listeners
     canvas.addEventListener('mousedown', startPainting);
@@ -324,7 +238,6 @@
     // Add current color to color history
     colorPicker.addEventListener('input', (event) => {
       currentColor = event.target.value;
-      addToColorHistory(currentColor);
     });
 
     // Toggle eraser tool
