@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Modern Paint App</title>
+  <title>ArtForge</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -19,7 +19,7 @@
       justify-content: space-between;
       align-items: center;
       padding: 10px 20px;
-      background: #4caf50;
+      background: #673ab7;
       color: white;
     }
     header h1 {
@@ -30,7 +30,7 @@
       display: flex;
       gap: 10px;
     }
-    .tools button, .tools input {
+    .tools button, .tools select, .tools input {
       padding: 8px 12px;
       border: none;
       border-radius: 5px;
@@ -45,6 +45,20 @@
     .tools button:hover {
       background: #e0e0e0;
     }
+    .preset-brushes {
+      display: flex;
+      gap: 5px;
+    }
+    .preset-brush {
+      width: 30px;
+      height: 30px;
+      border: 2px solid transparent;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .preset-brush:hover {
+      border: 2px solid #333;
+    }
     canvas {
       flex-grow: 1;
       border: 2px solid #ddd;
@@ -52,38 +66,75 @@
       border-radius: 10px;
       background: white;
     }
+    footer {
+      background: #673ab7;
+      color: white;
+      text-align: center;
+      padding: 10px;
+      font-size: 14px;
+    }
+    footer a {
+      color: #ffcc00;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    footer a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Modern Paint App</h1>
+    <h1>ArtForge</h1>
     <div class="tools">
       <input type="color" id="colorPicker" value="#000000">
-      <input type="range" id="brushSize" min="1" max="20" value="5">
+      <input type="range" id="brushSize" min="1" max="50" value="10">
+      <select id="brushType">
+        <option value="round">Round</option>
+        <option value="square">Square</option>
+      </select>
+      <label>
+        <input type="checkbox" id="touchMode">
+        Touch Mode
+      </label>
       <button id="clearCanvas">Clear</button>
       <button id="saveDrawing">Save</button>
     </div>
   </header>
+  <div class="preset-brushes">
+    <div class="preset-brush" style="background: red;" data-color="#ff0000" data-size="10"></div>
+    <div class="preset-brush" style="background: green;" data-color="#00ff00" data-size="20"></div>
+    <div class="preset-brush" style="background: blue;" data-color="#0000ff" data-size="30"></div>
+    <div class="preset-brush" style="background: yellow;" data-color="#ffff00" data-size="15"></div>
+    <div class="preset-brush" style="background: purple;" data-color="#800080" data-size="25"></div>
+  </div>
   <canvas id="paintCanvas"></canvas>
+  <footer>
+    Contact me at <a href="mailto:beggadsbegone@gmail.com">beggadsbegone@gmail.com</a>
+  </footer>
 
   <script>
     const canvas = document.getElementById('paintCanvas');
     const ctx = canvas.getContext('2d');
     const colorPicker = document.getElementById('colorPicker');
     const brushSize = document.getElementById('brushSize');
+    const brushType = document.getElementById('brushType');
+    const touchModeCheckbox = document.getElementById('touchMode');
     const clearCanvas = document.getElementById('clearCanvas');
     const saveDrawing = document.getElementById('saveDrawing');
+    const presetBrushes = document.querySelectorAll('.preset-brush');
 
     // Set canvas size
     function resizeCanvas() {
       canvas.width = window.innerWidth - 20;
-      canvas.height = window.innerHeight - 80;
+      canvas.height = window.innerHeight - 160; // Adjusted for footer and brushes
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
     // Variables for drawing
     let painting = false;
+    let touchMode = false;
 
     // Start drawing
     function startPainting(event) {
@@ -100,20 +151,57 @@
     // Draw on canvas
     function draw(event) {
       if (!painting) return;
-      ctx.lineWidth = brushSize.value;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = colorPicker.value;
 
-      ctx.lineTo(event.clientX - canvas.offsetLeft, event.clientY - canvas.offsetTop);
+      const x = event.clientX - canvas.offsetLeft;
+      const y = event.clientY - canvas.offsetTop;
+
+      ctx.lineWidth = brushSize.value;
+      ctx.strokeStyle = colorPicker.value;
+      ctx.lineCap = brushType.value === 'round' ? 'round' : 'butt';
+
+      ctx.lineTo(x, y);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(event.clientX - canvas.offsetLeft, event.clientY - canvas.offsetTop);
+      ctx.moveTo(x, y);
     }
+
+    // Lock the mouse to the canvas
+    function lockMouse(event) {
+      if (touchMode) {
+        event.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.max(Math.min(event.clientX, rect.right), rect.left);
+        const y = Math.max(Math.min(event.clientY, rect.bottom), rect.top);
+        draw({ clientX: x, clientY: y });
+      }
+    }
+
+    // Apply preset brush
+    presetBrushes.forEach((brush) => {
+      brush.addEventListener('click', () => {
+        const color = brush.getAttribute('data-color');
+        const size = brush.getAttribute('data-size');
+        colorPicker.value = color;
+        brushSize.value = size;
+      });
+    });
 
     // Event listeners
     canvas.addEventListener('mousedown', startPainting);
     canvas.addEventListener('mouseup', stopPainting);
     canvas.addEventListener('mousemove', draw);
+
+    // Enable mouse locking for touch mode
+    touchModeCheckbox.addEventListener('change', (event) => {
+      touchMode = event.target.checked;
+      if (touchMode) {
+        document.body.style.overflow = 'hidden'; // Disable page scrolling
+      } else {
+        document.body.style.overflow = 'auto';
+      }
+    });
+
+    canvas.addEventListener('mousemove', lockMouse);
 
     // Clear the canvas
     clearCanvas.addEventListener('click', () => {
