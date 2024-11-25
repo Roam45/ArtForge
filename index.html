@@ -3,252 +3,141 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixel Art Creator</title>
+  <title>Modern Paint App</title>
   <style>
     body {
       font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
+      height: 100vh;
+      background: #f4f4f4;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
       align-items: center;
+      padding: 10px 20px;
+      background: #4caf50;
+      color: white;
     }
-    #canvas-container {
-      position: relative;
+    header h1 {
+      margin: 0;
+      font-size: 20px;
     }
-    #paint-canvas {
-      border: 1px solid black;
-      cursor: crosshair;
+    .tools {
+      display: flex;
+      gap: 10px;
     }
-    .color {
-      width: 30px;
-      height: 30px;
-      margin: 2px;
-      display: inline-block;
+    .tools button, .tools input {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
       cursor: pointer;
     }
-    #palette {
-      display: flex;
-      margin-bottom: 10px;
+    .tools button {
+      background: #ffffff;
+      color: #333;
+      border: 1px solid #ddd;
     }
-    #controls {
-      margin-top: 10px;
+    .tools button:hover {
+      background: #e0e0e0;
     }
-    #auth-container {
-      margin-bottom: 20px;
-    }
-    #login-signup input {
-      margin: 5px;
+    canvas {
+      flex-grow: 1;
+      border: 2px solid #ddd;
+      margin: 10px;
+      border-radius: 10px;
+      background: white;
     }
   </style>
 </head>
 <body>
-  <h1>Pixel Art Creator</h1>
-
-  <!-- Login / Signup -->
-  <div id="auth-container">
-    <div id="login-signup">
-      <input type="email" id="email" placeholder="Email" />
-      <input type="password" id="password" placeholder="Password" />
-      <button id="login-button">Login</button>
-      <button id="signup-button">Sign Up</button>
-      <button id="logout-button" style="display: none;">Logout</button>
+  <header>
+    <h1>Modern Paint App</h1>
+    <div class="tools">
+      <input type="color" id="colorPicker" value="#000000">
+      <input type="range" id="brushSize" min="1" max="20" value="5">
+      <button id="clearCanvas">Clear</button>
+      <button id="saveDrawing">Save</button>
     </div>
-  </div>
+  </header>
+  <canvas id="paintCanvas"></canvas>
 
-  <!-- Canvas and Room Management -->
-  <div id="canvas-container">
-    <canvas id="paint-canvas"></canvas>
-    <div id="palette"></div>
-    <div id="controls">
-      <input type="text" id="room-name" placeholder="Room Name" />
-      <input type="password" id="room-password" placeholder="Room Password" />
-      <button id="create-room">Create Room</button>
-      <button id="join-room">Join Room</button>
-      <button id="reset-canvas">Reset Canvas</button>
-      <button id="undo">Undo</button>
-    </div>
-  </div>
+  <script>
+    const canvas = document.getElementById('paintCanvas');
+    const ctx = canvas.getContext('2d');
+    const colorPicker = document.getElementById('colorPicker');
+    const brushSize = document.getElementById('brushSize');
+    const clearCanvas = document.getElementById('clearCanvas');
+    const saveDrawing = document.getElementById('saveDrawing');
 
-  <!-- Firebase and Application Script -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-auth.js";
-    import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/9.17.1/firebase-database.js";
+    // Set canvas size
+    function resizeCanvas() {
+      canvas.width = window.innerWidth - 20;
+      canvas.height = window.innerHeight - 80;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
-    // Firebase configuration
-    const firebaseConfig = {
-      apiKey: "AIzaSyC-wJdotEQqjlpCMrmBXaa7VCxTnG_0ksw",
-      authDomain: "eeeeeeee-5fcd8.firebaseapp.com",
-      databaseURL: "https://eeeeeeee-5fcd8-default-rtdb.firebaseio.com",
-      projectId: "eeeeeeee-5fcd8",
-      storageBucket: "eeeeeeee-5fcd8.appspot.com",
-      messagingSenderId: "120108097948",
-      appId: "1:120108097948:web:ff67fe909b919397a3a859",
-      measurementId: "G-3K7B56SWMH"
-    };
-
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth();
-    const db = getDatabase();
-
-    // DOM Elements
-    const canvasContainer = document.getElementById("canvas-container");
-    const paintCanvas = document.getElementById("paint-canvas");
-    const ctx = paintCanvas.getContext("2d");
-    const palette = document.getElementById("palette");
-    const roomNameInput = document.getElementById("room-name");
-    const roomPasswordInput = document.getElementById("room-password");
-    const createRoomButton = document.getElementById("create-room");
-    const joinRoomButton = document.getElementById("join-room");
-    const resetCanvasButton = document.getElementById("reset-canvas");
-    const undoButton = document.getElementById("undo");
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const loginButton = document.getElementById("login-button");
-    const signupButton = document.getElementById("signup-button");
-    const logoutButton = document.getElementById("logout-button");
-
-    let currentColor = "black";
-    let brushSize = 5;
-    let currentRoom = null;
-
-    // Set up color palette
-    const colors = ["red", "green", "blue", "yellow", "black", "white"];
-    colors.forEach(color => {
-      const colorDiv = document.createElement("div");
-      colorDiv.classList.add("color");
-      colorDiv.style.backgroundColor = color;
-      colorDiv.dataset.color = color;
-      palette.appendChild(colorDiv);
-    });
-
-    // Canvas setup
-    paintCanvas.width = 500;
-    paintCanvas.height = 400;
+    // Variables for drawing
     let painting = false;
 
-    paintCanvas.addEventListener("mousedown", (e) => {
+    // Start drawing
+    function startPainting(event) {
       painting = true;
-      draw(e);
-    });
-
-    paintCanvas.addEventListener("mousemove", (e) => {
-      if (painting) draw(e);
-    });
-
-    paintCanvas.addEventListener("mouseup", () => painting = false);
-
-    function draw(e) {
-      const rect = paintCanvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-
-      ctx.fillStyle = currentColor;
-      ctx.fillRect(x, y, brushSize, brushSize);
-
-      if (currentRoom) {
-        const roomRef = ref(db, `rooms/${currentRoom}/boardState`);
-        update(roomRef, { [Date.now()]: { x, y, color: currentColor, size: brushSize } });
-      }
+      draw(event);
     }
 
-    // Listen for updates from Firebase
-    function listenToRoomUpdates(roomName) {
-      const roomRef = ref(db, `rooms/${roomName}/boardState`);
-      onValue(roomRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          for (let action of Object.values(data)) {
-            ctx.fillStyle = action.color;
-            ctx.fillRect(action.x, action.y, action.size, action.size);
-          }
-        }
-      });
+    // Stop drawing
+    function stopPainting() {
+      painting = false;
+      ctx.beginPath();
     }
 
-    // Room management
-    createRoomButton.addEventListener("click", () => {
-      const roomName = roomNameInput.value;
-      const roomPassword = roomPasswordInput.value;
+    // Draw on canvas
+    function draw(event) {
+      if (!painting) return;
+      ctx.lineWidth = brushSize.value;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = colorPicker.value;
 
-      if (roomName && roomPassword) {
-        const roomRef = ref(db, `rooms/${roomName}`);
-        get(roomRef).then((snapshot) => {
-          if (!snapshot.exists()) {
-            set(roomRef, { password: roomPassword, boardState: {} });
-            currentRoom = roomName;
-            listenToRoomUpdates(roomName);
-          } else {
-            alert("Room already exists!");
-          }
-        });
-      }
-    });
-
-    joinRoomButton.addEventListener("click", () => {
-      const roomName = roomNameInput.value;
-      const roomPassword = roomPasswordInput.value;
-
-      if (roomName && roomPassword) {
-        const roomRef = ref(db, `rooms/${roomName}`);
-        get(roomRef).then((snapshot) => {
-          if (snapshot.exists()) {
-            const roomData = snapshot.val();
-            if (roomData.password === roomPassword) {
-              currentRoom = roomName;
-              listenToRoomUpdates(roomName);
-            } else {
-              alert("Incorrect password!");
-            }
-          } else {
-            alert("Room not found!");
-          }
-        });
-      }
-    });
-
-    resetCanvasButton.addEventListener("click", () => {
-      ctx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
-      if (currentRoom) {
-        const roomRef = ref(db, `rooms/${currentRoom}/boardState`);
-        set(roomRef, {});
-      }
-    });
-
-    palette.addEventListener("click", (e) => {
-      if (e.target.classList.contains("color")) {
-        currentColor = e.target.dataset.color;
-      }
-    });
-
-    // Authentication
-    loginButton.addEventListener("click", () => {
-      signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
-        .then(() => toggleAuthUI())
-        .catch((err) => alert(err.message));
-    });
-
-    signupButton.addEventListener("click", () => {
-      createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
-        .then(() => toggleAuthUI())
-        .catch((err) => alert(err.message));
-    });
-
-    logoutButton.addEventListener("click", () => {
-      signOut(auth).then(() => toggleAuthUI());
-    });
-
-    function toggleAuthUI() {
-      if (auth.currentUser) {
-        logoutButton.style.display = "block";
-        document.getElementById("login-signup").style.display = "none";
-      } else {
-        logoutButton.style.display = "none";
-        document.getElementById("login-signup").style.display = "block";
-      }
+      ctx.lineTo(event.clientX - canvas.offsetLeft, event.clientY - canvas.offsetTop);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(event.clientX - canvas.offsetLeft, event.clientY - canvas.offsetTop);
     }
 
-    onAuthStateChanged(auth, () => toggleAuthUI());
+    // Event listeners
+    canvas.addEventListener('mousedown', startPainting);
+    canvas.addEventListener('mouseup', stopPainting);
+    canvas.addEventListener('mousemove', draw);
+
+    // Clear the canvas
+    clearCanvas.addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    // Save the drawing
+    saveDrawing.addEventListener('click', () => {
+      const drawing = canvas.toDataURL('image/png');
+      localStorage.setItem('savedDrawing', drawing);
+      alert('Drawing saved to local storage!');
+    });
+
+    // Load the saved drawing
+    window.addEventListener('load', () => {
+      const savedDrawing = localStorage.getItem('savedDrawing');
+      if (savedDrawing) {
+        const img = new Image();
+        img.src = savedDrawing;
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        };
+      }
+    });
   </script>
 </body>
 </html>
